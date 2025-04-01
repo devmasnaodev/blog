@@ -59,19 +59,21 @@ h6 {
   color: rgb(var(--black));
   line-height: 1.2;
 }
-h1 {
+.h1 {
   font-size: 3.052em;
 }
-h2 {
+.h2 {
   font-size: 2.441em;
+  color: rgb(var(--gray-dark));
 }
-h3 {
+.h3 {
   font-size: 1.953em;
+  color: rgb(var(--gray));
 }
-h4 {
+.h4 {
   font-size: 1.563em;
 }
-h5 {
+.h5 {
   font-size: 1.25em;
 }
 strong,
@@ -128,6 +130,14 @@ hr {
   border-top: 1px solid rgb(var(--gray-light));
 }
 @media (max-width: 720px) {
+  .h1,
+  .h2,
+  .h3,
+  .h4,
+  .h5,
+  .h6 {
+    font-size: 1.5em;
+  }
   body {
     font-size: 18px;
   }
