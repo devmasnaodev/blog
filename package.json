@@ -6,7 +6,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "prebuild": "node scripts/convert-to-avif.js",
+    "compress": "node scripts/convert-to-avif.js",
     "astro": "astro"
   },
   "dependencies": {
