@@ -1,0 +1,44 @@
+---
+title: "Crie chaves SSH no Windows com OpenSSH"
+slug: "crie-chaves-ssh-no-windows"
+description: "Tutorial no youtube"
+pubDate: "2023-02-01"
+author: "Rodrigo Gomes"
+tags: ["Windows", "SSH", "OpenSSH"]
+heroImage: "/images/2023/02/post-01/cover-crie-chaves-ssh-no-windows.avif"
+---
+
+import YoutubeEmbed from "../../../../components/YoutubeEmbed.astro";
+
+<YoutubeEmbed id="oubaa9LSBCE" />
+[Assista no Youtube](https://www.youtube.com/watch?v=oubaa9LSBCE)
+
+## Alguns benefícios do ed25519
+
+Hoje, o RSA é o algoritmo de chave pública mais usado para a chave SSH. Mas comparado com Ed25519, é mais lento e até considerado não seguro se for gerado com a chave menor que 2048 bits de comprimento.
+
+O Ed25519 é compacto. Contém apenas 68 caracteres, em comparação com RSA 3072 que tem 544 caracteres. Gerar a chave também é quase tão rápido quanto o processo de assinatura. Também é rápido realizar verificação de assinatura em lote com Ed25519.Abra seu terminal e digite o seguinte comando para gerar uma nova chave SSH que usa o algoritmo Ed25519:
+
+### Linux
+
+```shell
+ssh-keygen -o -a 100 -t ed25519 -f ~/.ssh/id_rdev -C "seu@email.com"
+```
+
+### Windows (Powershell)
+
+```shell
+ssh-keygen -a 100 -t ed25519 -f "$env:USERPROFILE\.ssh\id_rdev" -C "seu@email.com"
+```
+
+Será solicitado a inserir uma senha para esta chave, use uma senha forte. Você também pode usar a mesma senha de qualquer uma das suas chaves SSH antigas.
+
+- `o:` Salve a private-key usando o novo formato OpenSSH em vez do formato PEM. Na verdade, essa opção está implícita quando você especifica o tipo de tecla como .ed25519
+- `a:` São os números das rodadas KDF (Key Derivation Function). Números mais altos resultam em verificação mais lenta da senha, aumentando a resistência à quebra de senha de força bruta caso a private-key seja roubada.
+- `t:` Especifica o tipo de chave que será criar, no nosso caso o Ed25519.
+- `f:` Especifique o nome do arquivo do arquivo gerado.
+- `C:` Uma opção para especificar um comentário. É puramente informativo e pode ser qualquer coisa.
+
+### Links úteis
+
+- [Gerenciamento de chaves do OpenSSH para Windows](https://docs.microsoft.com/pt-br/windows-server/administration/openssh/openssh_keymanagement)
