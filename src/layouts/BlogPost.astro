@@ -16,7 +16,7 @@ const { title, description, pubDate, updatedDate, author, heroImage } =
     <BaseHead title={title} description={description} />
     <style>
       main {
-        width: calc(100% - 2em);
+        width: 100%;
         max-width: 100%;
         margin: 0;
       }
@@ -30,11 +30,11 @@ const { title, description, pubDate, updatedDate, author, heroImage } =
         box-shadow: var(--box-shadow);
       }
       .prose {
-        width: 720px;
-        max-width: calc(100% - 2em);
+        width: 820px;
+        max-width: 100%;
         margin: auto;
         padding: 1em;
-        color: rgb(var(--gray-dark));
+        color: var(--text-color);
       }
       .title {
         margin-bottom: 1em;
@@ -47,7 +47,7 @@ const { title, description, pubDate, updatedDate, author, heroImage } =
       }
       .date {
         margin-bottom: 0.5em;
-        color: rgb(var(--gray));
+        color: rgb(var(--text-color));
       }
       .author {
         margin-bottom: 0.5em;

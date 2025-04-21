@@ -28,3 +28,12 @@
     color: #555;
     flex: 1;
 }
+
+@media (prefers-color-scheme: dark) {
+    .custom-galleria-footer {
+        background-color: #312f31;
+    }
+    .title-container {
+        color: #ffffff;
+    }
+  }
