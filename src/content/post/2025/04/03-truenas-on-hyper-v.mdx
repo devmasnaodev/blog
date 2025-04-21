@@ -1,0 +1,265 @@
+---
+title: "Instale o TrueNAS Scale no Hyper-v"
+slug: "truenas-on-hyper-v"
+description: "Primeiros passos com TrueNAS"
+pubDate: "2025-04-21"
+author: "Rodrigo Gomes"
+tags: ["Hyper-V", "TrueNAS"]
+heroImage: "/images/2025/04/post-03/cover-truenas-on-hyper-v.avif"
+---
+
+import Gallery from "@/components/Gallery/Gallery.astro"
+
+## O que é o [TrueNAS Scale](https://www.truenas.com/truenas-scale/)?
+
+O TrueNAS SCALE é uma versão do TrueNAS baseada em Linux, especificamente projetada para oferecer uma plataforma de armazenamento escalável e flexível para ambientes modernos. Ao contrário do TrueNAS CORE, que é baseado em FreeBSD, o TrueNAS SCALE foi criado para ser altamente compatível com containers, virtualização e aplicativos de código aberto. Ele combina o poder do sistema de arquivos ZFS com a flexibilidade e a escalabilidade do Kubernetes e dos containers Docker, permitindo que você gerencie tanto o armazenamento tradicional quanto os containers em um único sistema.
+
+## Objetivo do laboratório
+
+- Instalar o TrueNAS SCALE em um ambiente virtualizado utilizando o Hyper-V.
+- Configurar uma rede interna dedicada para o laboratório, garantindo maior controle sobre os endereços IP atribuídos às máquinas virtuais.
+- Criar discos virtuais para armazenamento em RAID-Z1 e um disco de reserva (spare).
+- Configurar a interface de rede do TrueNAS SCALE com um IP estático, permitindo o acesso à interface web.
+- Criar um pool de armazenamento configurando o RAID-Z1 e o disco de reserva.
+
+
+## Instalação no Hyper-V
+
+Neste laboratório, utilizaremos o Hyper-V como plataforma de virtualização para a implantação do TrueNAS SCALE. No entanto, vale destacar que a instalação também pode ser realizada em outros hypervisors, como VMware ESXi, Proxmox ou VirtualBox, de acordo com a preferência ou o ambiente disponível.
+
+A topologia simulada para este ambiente de testes será composta pelos seguintes discos virtuais:
+
+- 1 disco destinado ao sistema operacional (boot)
+- 3 discos para armazenamento em configuração RAID-Z1
+- 1 disco adicional configurado como disco de reserva (spare)
+
+Antes de iniciar o processo de instalação, é fundamental assegurar que o ambiente Hyper-V esteja corretamente configurado, com suporte a virtualização aninhada, e que os recursos de hardware alocados à máquina virtual atendam aos requisitos mínimos recomendados pelo TrueNAS SCALE. Isso inclui, entre outros:
+
+- Processador com suporte a virtualização (Intel VT-x ou AMD-V)
+- Mínimo de 8 GB de memória RAM (recomendado 16 GB para uso com ZFS)
+- Espaço em disco adequado para a criação dos volumes virtuais.
+
+## Preparando o ambiente
+
+> ⚠️ **Importante:** Durante este guia, utilizaremos comandos via **PowerShell** para otimizar tarefas repetitivas e agilizar o processo de configuração. Certifique-se de executar o **PowerShell com privilégios de administrador**, a fim de evitar problemas relacionados a permissões.
+
+Caso prefira, todos os procedimentos descritos também podem ser realizados através da **interface gráfica (GUI)** do Hyper-V e do sistema operacional
+
+
+### Endereçamentos de rede
+
+Para uma gestão mais eficiente dos endereçamentos de rede no ambiente de laboratório, é recomendável a criação de uma rede interna dedicada. Essa abordagem permite maior controle sobre os endereços IP atribuídos às máquinas virtuais, além de evitar conflitos com outras redes em uso no host.
+
+```powershell
+# 1. Criar switch interno
+New-VMSwitch -SwitchName "vSwitchInterno" -SwitchType Internal
+
+# 2. Configurar IP da interface vEthernet do host
+New-NetIPAddress -IPAddress 192.168.100.1 -PrefixLength 24 -InterfaceAlias "vEthernet (vSwitchInterno)"
+
+# 3. Habilitar NAT
+New-NetNat -Name "vNatInterno" -InternalIPInterfaceAddressPrefix 192.168.100.0/24
+```
+
+⚠️ **Importante:** Certifique-se de que não existam regras de NAT anteriores com o mesmo prefixo de rede para evitar conflitos. Você pode verificar as regras existentes com o comando `Get-NetNat.`
+
+Após a configuração você pode consultar o novo Switch Virtual criado com o comando `Get-VMSwitch`
+
+![Get-VMSwitch](/images/2025/04/post-03/01-truenas-on-hyper-v.avif)
+
+### Crie os discos Virtuais
+
+No exemplo vamos criar 4 discos virtuais para o armazenamento, com os comandos abaixo
+
+```powershell
+# Diretório onde os discos serão criados
+$directory = "E:\Hyper-V\VHD\LabTrueNAS" # Altere para o caminho desejado
+
+# Certifique-se de que o diretório existe
+New-Item -ItemType Directory -Path $directory -Force | Out-Null
+
+# Criar 3 discos dinamicamente alocados de 64GB para Raid Z1
+for ($i = 1; $i -le 3; $i++) {
+    $path = Join-Path $directory "Disk$i.vhdx"
+    New-VHD -Path $path -SizeBytes 64GB -Dynamic
+}
+
+# Criar 1 disco dinamicamente alocado de 64GB para Spare
+$path = Join-Path $directory "Spare.vhdx"
+New-VHD -Path $path -SizeBytes 64GB -Dynamic
+```
+
+Caso todos os comandos sejam executados corretamente, os arquivos `.vhdx` correspondentes estarão disponíveis no diretório de destino especificado.
+
+![Discos criados](/images/2025/04/post-03/02-truenas-on-hyper-v.avif)
+
+### Crie a maquina virtual
+
+Para este laboratório, a criação da máquina virtual será realizada utilizando o **Gerenciador do Hyper-V**, considerando a simplicidade do procedimento. Abaixo estão os parâmetros recomendados para a configuração da VM:
+
+- **Nome:** `TrueNAS Scale - LAB`
+- **Geração:** `2ª Geração (Generation 2)`
+- **Memória:** `12.288 MB (12 GB)` – ative a opção de **alocação dinâmica de memória**
+- **Rede:** Conectada ao switch virtual `vSwitchInterno`
+- **Disco Rígido:** Utilize as configurações padrão sugeridas pela interface
+- **Sistema Operacional:** Selecione a **ISO do TrueNAS Scale**, que pode ser [baixada diretamente no site oficial](https://www.truenas.com/download-truenas-scale/)
+    
+<Gallery 
+  images={[
+    { image: "/images/2025/04/post-03/03-truenas-on-hyper-v.avif", alt: "Especificar nome e Local"},
+    { image: "/images/2025/04/post-03/04-truenas-on-hyper-v.avif", alt: "Especificar Geração" },
+    { image: "/images/2025/04/post-03/05-truenas-on-hyper-v.avif", alt: "Atribuir Memória" },
+    { image: "/images/2025/04/post-03/06-truenas-on-hyper-v.avif", alt: "Configurar Rede" },
+    { image: "/images/2025/04/post-03/07-truenas-on-hyper-v.avif", alt: "Conectar Disco Rígido Virtual" },
+    { image: "/images/2025/04/post-03/08-truenas-on-hyper-v.avif", alt: "Opções de Instalação" },
+    { image: "/images/2025/04/post-03/09-truenas-on-hyper-v.avif", alt: "Resumo" },
+  ]}
+/>
+
+> 💡 Lembre-se de que os discos de armazenamento adicionais serão inseridos posteriormente, conforme descrito nas próximas etapas do guia.
+> 
+
+Em configurações da maquina virtual recém criada desative as opções
+
+- Segurança → Inicialização Seguro (Desabilitado)
+- Pontos de verificação → Habilitar pontos de verificação (Desabilitado)
+
+<Gallery 
+  images={[
+    { image: "/images/2025/04/post-03/10-truenas-on-hyper-v.avif", alt: "Segurança → Inicialização Seguro"},
+    { image: "/images/2025/04/post-03/11-truenas-on-hyper-v.avif", alt: "Pontos de verificação" },
+  ]}
+/>
+
+Crie um novo controlador SCSI independente para os discos de armazenamento e anexe todos os discos criados anteriormente.
+
+![Discos adicionais](/images/2025/04/post-03/12-truenas-on-hyper-v.avif)
+
+## Instalação do TrueNAS.
+
+Procedimentos de instalação.
+
+- Inicie a VM
+- **Selecione:** Start TrueNAS SCALE Installation
+- **Console Setup:** (1) Install/Upgrade
+- **Choose Destination Media:** [*] sda Virtual Disk — 127GiB
+- **TrueNAS Installation:** < Yes >
+- **Web UI Authentication Method:** (1) Administrative User (truenas_admin)
+- Crie a senha administrativa e confirme
+- **Console Setup:** (3) Reboot System
+
+<Gallery 
+  images={[
+    { image: "/images/2025/04/post-03/13-truenas-on-hyper-v.avif", alt: "Selecione: Start TrueNAS SCALE Installation"},
+    { image: "/images/2025/04/post-03/14-truenas-on-hyper-v.avif", alt: "Console Setup: (1) Install/Upgrade"},
+    { image: "/images/2025/04/post-03/15-truenas-on-hyper-v.avif", alt: "Choose Destination Media: [*] sda Virtual Disk — 127GiB"},
+    { image: "/images/2025/04/post-03/16-truenas-on-hyper-v.avif", alt: "TrueNAS Installation: < Yes >"},
+    { image: "/images/2025/04/post-03/17-truenas-on-hyper-v.avif", alt: "Web UI Authentication Method: (1) Administrative User (truenas_admin)"},
+    { image: "/images/2025/04/post-03/18-truenas-on-hyper-v.avif", alt: "Crie a senha administrativa e confirme"},
+    { image: "/images/2025/04/post-03/19-truenas-on-hyper-v.avif", alt: "Instalação finalizada"},
+    { image: "/images/2025/04/post-03/20-truenas-on-hyper-v.avif", alt: "Console Setup: (3) Reboot System"}
+  ]}
+/>
+
+### Configuração da interface de rede.
+
+Assim que a instalação for concluída e a instância do TrueNAS estiver reiniciado será necessário configurar a interface de rede com um IP estático sendo que estamos utilizando um Switch Customizado que não possui DHCP
+
+- **Selecione a opção:** 1) Configure network interfaces
+- **Selecione a interface de rede:** eth0
+- **Defina ipv4_dhcp:** No
+- **Selecione aliases:**
+- **Defina o IP:** 192.168.100.10/24
+- **Salve as configurações:** < Save >
+- **Aplique as configurações:** < a >
+- **Persista as configurações:** < p >
+- **Confirme para sair do assistente:** < q > 
+
+<Gallery 
+  images={[
+    { image: "/images/2025/04/post-03/21-truenas-on-hyper-v.avif", alt: "Selecione: Start TrueNAS SCALE Installation"},
+    { image: "/images/2025/04/post-03/22-truenas-on-hyper-v.avif", alt: "Console Setup: (1) Install/Upgrade"},
+    { image: "/images/2025/04/post-03/23-truenas-on-hyper-v.avif", alt: "Choose Destination Media: [*] sda Virtual Disk — 127GiB"},
+    { image: "/images/2025/04/post-03/24-truenas-on-hyper-v.avif", alt: "TrueNAS Installation: < Yes >"},
+    { image: "/images/2025/04/post-03/25-truenas-on-hyper-v.avif", alt: "Web UI Authentication Method: (1) Administrative User (truenas_admin)"},
+    { image: "/images/2025/04/post-03/26-truenas-on-hyper-v.avif", alt: "Crie a senha administrativa e confirme"},
+    { image: "/images/2025/04/post-03/27-truenas-on-hyper-v.avif", alt: "Instalação finalizada"},
+    { image: "/images/2025/04/post-03/28-truenas-on-hyper-v.avif", alt: "Console Setup: (3) Reboot System"},
+    { image: "/images/2025/04/post-03/29-truenas-on-hyper-v.avif", alt: "Console Setup: (3) Reboot System"}
+  ]}
+/>
+
+## Primeiros passos após a instalação
+
+Neste ponto, a interface de rede do TrueNAS SCALE estará configurada com o IP estático, e o acesso à interface web pode ser feito através do navegador diretamente pelo host.
+
+Vamos acessar a interface web do TrueNAS SCALE através do IP configurado `http://192.168.100.10`, e realizar o login com o usuário `truenas_admin` e a senha definida durante a instalação.
+
+![Realize o Login](/images/2025/04/post-03/30-truenas-on-hyper-v.avif)
+
+### Configuração de DNS
+
+Após o login, é importante configurar o DNS para garantir que o TrueNAS SCALE possa resolver nomes de domínio corretamente. Isso é essencial para a comunicação com outros serviços.
+
+- Acesse Network → Global Configuration → Settings
+- Defina o DNS Server como
+  - NS1: `1.1.1.1`
+  - NS2: `1.0.0.1`
+- Default Gateway: `192.168.100.1`
+
+<Gallery 
+  images={[
+    { image: "/images/2025/04/post-03/31-truenas-on-hyper-v.avif", alt: "Acesse Network → Global Configuration → Settings"},
+    { image: "/images/2025/04/post-03/32-truenas-on-hyper-v.avif", alt: "Configure o DNS Server e Default Gateway"},
+    { image: "/images/2025/04/post-03/33-truenas-on-hyper-v.avif", alt: "Configurações aplicadas com sucesso"}
+  ]}
+/>
+
+### Configuração de Armazenamento
+
+Agora que o TrueNAS SCALE está instalado e configurado, é hora de adicionar os discos virtuais criados anteriormente para formar um pool de armazenamento. Isso permitirá que você utilize o ZFS para gerenciar seus dados de forma eficiente e segura.
+
+Nos iremos utilizar 3 discos virtuais de 64GB para criar um pool de armazenamento em RAID-Z1, e um disco adicional de 64GB como disco de reserva (spare).
+
+> Outra opções como (logs, cache e deduplicação) não serão abordadas neste guia, mas podem ser configuradas posteriormente conforme a necessidade.
+
+- Verifique os discos disponíveis para configuração em:
+  - Storage → `Disks`
+- Para criar o pool de armazenamento, acesse:
+  - Storage → `Create Pool`
+- **General Info**, defina o nome do pool como `Datastore`
+  - Encryption: `Disabled`
+- **Data** Defina o tipo do pool como `RAID-Z1`
+  - Disk Size: `64 GiB`
+  - Width*: `3`
+  - Number of vDEVs*: `1`
+- **Spare** (optional)
+  - Disk Size*: `64 GiB`
+  - Width*: `1`
+- Revise as configurações e clique em `Create Pool` para criar o pool de armazenamento.
+  - Confirme o Warning de formatação dos discos
+
+<Gallery 
+  images={[
+    { image: "/images/2025/04/post-03/34-truenas-on-hyper-v.avif", alt: "Storage Dashboard"},
+    { image: "/images/2025/04/post-03/35-truenas-on-hyper-v.avif", alt: "Verifique os discos disponíveis para configuração"},
+    { image: "/images/2025/04/post-03/36-truenas-on-hyper-v.avif", alt: "Em Data Defina o tipo do pool como `RAID-Z1`"},
+    { image: "/images/2025/04/post-03/37-truenas-on-hyper-v.avif", alt: "Em Spare (optional)"},
+    { image: "/images/2025/04/post-03/38-truenas-on-hyper-v.avif", alt: "Revise as configurações e clique em `Create Pool`"},
+    { image: "/images/2025/04/post-03/39-truenas-on-hyper-v.avif", alt: "Confirme o Warning de formatação dos discos"}
+  ]}
+/>
+
+> ⚠️ **Importante:** O processo de criação do pool irá formatar os discos selecionados, portanto, certifique-se de que não haja dados importantes neles antes de prosseguir.
+
+![Pool criado com sucesso](/images/2025/04/post-03/40-truenas-on-hyper-v.avif)
+
+Este é o resultado final do pool criado com sucesso, e agora você pode começar a utilizar o TrueNAS SCALE para gerenciar seu armazenamento de forma eficiente e segura, lembrando que o TrueNAS SCALE também oferece suporte a containers e virtualização, permitindo que você expanda ainda mais suas capacidades de armazenamento e gerenciamento de dados.
+
+## Considerações Finais
+
+O Objetivo deste laboratório foi proporcionar uma introdução prática ao TrueNAS SCALE, permitindo que você explore suas funcionalidades e comece a utilizá-lo em seu ambiente de testes. À medida que você se familiariza com a interface e os recursos do TrueNAS SCALE, considere explorar outras funcionalidades avançadas, como snapshots, replicação e integração com serviços de nuvem.
+
+Se encontrou algum erro ou deseja sugerir melhorias, acesse o repositório do projeto no Github e fique à vontade para contribuir. Agradeço por acompanhar este guia e espero que tenha sido útil para você.
+
+
