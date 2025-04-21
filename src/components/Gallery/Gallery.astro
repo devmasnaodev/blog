@@ -1,0 +1,6 @@
+---
+import GalleryReact from './GalleryReact.jsx';
+const { images } = Astro.props;
+---
+
+<GalleryReact images={images} client:only="react" />
