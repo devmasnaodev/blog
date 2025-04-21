@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+// source: https://primereact.org/galleria/#advanced
+
+import { useState, useEffect, useRef } from 'react';
 import { Button } from 'primereact/button';
 import { Galleria } from 'primereact/galleria';
 import { classNames } from 'primereact/utils';
@@ -7,7 +9,7 @@ import './Gallery.css';
 export default function GalleryReact({images}) {
     const [activeIndex, setActiveIndex] = useState(0);
     const [showThumbnails, setShowThumbnails] = useState(false);
-    const [isAutoPlayActive, setAutoPlayActive] = useState(true);
+    const [isAutoPlayActive, setAutoPlayActive] = useState(false);
     const [isFullScreen, setFullScreen] = useState(false);
     
     const galleria = useRef(null);
@@ -21,34 +23,43 @@ export default function GalleryReact({images}) {
 
 
     useEffect(() => {
-        setAutoPlayActive(galleria.current.isAutoPlayActive());
+        bindDocumentListeners();
+        return () => unbindDocumentListeners();
+    },[]);
+
+    useEffect(() => {
+        setAutoPlayActive(galleria.current.isAutoPlayActive())
     },[isAutoPlayActive]);
 
     const onItemChange = (event) => {
-        setActiveIndex(event.index);
+        setActiveIndex(event.index)
     }
 
     const toggleFullScreen = () => {
         if (isFullScreen) {
             closeFullScreen();
-        } else {
+        }
+        else {
             openFullScreen();
         }
     }
 
     const onFullScreenChange = () => {
-        setFullScreen(prevState => !prevState);
+        setFullScreen(prevState => !prevState )
     }
 
     const openFullScreen = () => {
-        let elem = document.querySelector('.custom-galleria');
+        let elem = galleria.current?.getElement();
         if (elem.requestFullscreen) {
             elem.requestFullscreen();
-        } else if (elem.mozRequestFullScreen) { 
+        }
+        else if (elem.mozRequestFullScreen) { /* Firefox */
             elem.mozRequestFullScreen();
-        } else if (elem.webkitRequestFullscreen) { 
+        }
+        else if (elem.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
             elem.webkitRequestFullscreen();
-        } else if (elem.msRequestFullscreen) { 
+        }
+        else if (elem.msRequestFullscreen) { /* IE/Edge */
             elem.msRequestFullscreen();
         }
     }
@@ -56,11 +67,14 @@ export default function GalleryReact({images}) {
     const closeFullScreen = () => {
         if (document.exitFullscreen) {
             document.exitFullscreen();
-        } else if (document.mozCancelFullScreen) {
+        }
+        else if (document.mozCancelFullScreen) {
             document.mozCancelFullScreen();
-        } else if (document.webkitExitFullscreen) {
+        }
+        else if (document.webkitExitFullscreen) {
             document.webkitExitFullscreen();
-        } else if (document.msExitFullscreen) {
+        }
+        else if (document.msExitFullscreen) {
             document.msExitFullscreen();
         }
     }
@@ -81,7 +95,7 @@ export default function GalleryReact({images}) {
 
     const thumbnailTemplate = (item) => {
         return (
-            <div className="grid grid-nogutter justify-content-center">
+            <div>
                 <img src={item.image} alt={item.alt} style={{ display: 'block' }} />
             </div>
         );

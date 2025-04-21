@@ -1,9 +1,14 @@
 .p-galleria-content{
-    height: calc(100% - 64px);
+    height: calc(100% - 72px);
+    margin-bottom: 8px;
 }
 
 .p-galleria-item-wrapper{
     height: 100%;
+}
+
+.p-galleria-thumbnail-item-content{
+    padding-inline: 4px;
 }
 
 .custom-galleria-footer {
