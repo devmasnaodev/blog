@@ -1,0 +1,3 @@
+#!/bin/sh
+# Valida a mensagem do commit com commitlint
+npx commitlint --edit "$1"

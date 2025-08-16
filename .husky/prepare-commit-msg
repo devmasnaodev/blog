@@ -1,0 +1,15 @@
+#!/bin/bash
+
+MSG_FILE=$1
+
+# Lê a primeira linha da mensagem
+FIRST_LINE=$(head -n1 "$MSG_FILE")
+
+# Se já começa com "bump:", não roda o Commitizen
+if echo "$FIRST_LINE" | grep -qE '^bump:'; then
+  echo "⚡ Commit bump detectado, pulando Commitizen..."
+  exit 0
+fi
+
+# Caso contrário, chama o Commitizen
+exec < /dev/tty && node_modules/.bin/cz --hook || true
